@@ -10,8 +10,6 @@ import {
   MeshTxBuilder,
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
-import dotenv from "dotenv";
-dotenv.config();
 
 // Integrasi smart-contract
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
@@ -46,55 +44,57 @@ export default function Home() {
   }
 
   async function unlockAssets() {
-    // Mendapatkan index utxo berdasarkan transaction hash aset yang didepostikan di contract address
-    const utxo = await getUtxoByTxHash(txHash);
-    if (utxo === undefined) throw new Error("UTxO not found");
-
-    // Mendapatkan script smart-contract dalam format CBOR
-    const { scriptCbor } = getScript(
-      contractBlueprint.validators[0].compiledCode
-    );
-
-    // Mendapatkan index utxo, alamat wallet, dan kolateral
-    const { utxos, walletAddress, collateral } = await getWalletInfo();
-
-    // Mendapatkan pub key hash sebagai persetujuan user untuk menandatangi transaksi
-    const signerHash = deserializeAddress(walletAddress).pubKeyHash;
-
-    // Membuat draft transaksi
-    const txBuild = new MeshTxBuilder({
-      fetcher: nodeProvider,
-      submitter: nodeProvider,
-    });
-    const txDraft = await txBuild
-      .spendingPlutusScript("V3")
-      .txIn(
-        utxo.input.txHash,
-        utxo.input.outputIndex,
-        utxo.output.amount,
-        utxo.output.address
-      )
-      .txInScript(scriptCbor)
-      .txInRedeemerValue(mConStr0([stringToHex(refNumber)]))
-      .txInDatumValue(mConStr0([signerHash]))
-      .requiredSignerHash(signerHash)
-      .changeAddress(walletAddress)
-      .txInCollateral(
-        collateral.input.txHash,
-        collateral.input.outputIndex,
-        collateral.output.amount,
-        collateral.output.address
-      )
-      .selectUtxosFrom(utxos)
-      .complete();
-
-    // Menandatangani transaksi
-    const signedTx = await wallet.signTx(txDraft);
-
     try {
+      // Mendapatkan index utxo berdasarkan transaction hash aset yang didepostikan di contract address
+      const utxo = await getUtxoByTxHash(txHash);
+      if (utxo === undefined) throw new Error("UTxO not found");
+
+      // Mendapatkan script smart-contract dalam format CBOR
+      const { scriptCbor } = getScript(
+        contractBlueprint.validators[0].compiledCode
+      );
+
+      // Mendapatkan index utxo, alamat wallet, dan kolateral
+      const { utxos, walletAddress, collateral } = await getWalletInfo();
+
+      // Mendapatkan pub key hash sebagai persetujuan user untuk menandatangi transaksi
+      const signerHash = deserializeAddress(walletAddress).pubKeyHash;
+
+      // Membuat draft transaksi
+      const txBuild = new MeshTxBuilder({
+        fetcher: nodeProvider,
+        evaluator: nodeProvider,
+        verbose: true,
+      });
+      const txDraft = await txBuild
+        .setNetwork("preprod")
+        .spendingPlutusScript("V3")
+        .txIn(
+          utxo.input.txHash,
+          utxo.input.outputIndex,
+          utxo.output.amount,
+          utxo.output.address
+        )
+        .txInScript(scriptCbor)
+        .txInRedeemerValue(mConStr0([stringToHex(refNumber)]))
+        .txInDatumValue(mConStr0([signerHash]))
+        .requiredSignerHash(signerHash)
+        .changeAddress(walletAddress)
+        .txInCollateral(
+          collateral.input.txHash,
+          collateral.input.outputIndex,
+          collateral.output.amount,
+          collateral.output.address
+        )
+        .selectUtxosFrom(utxos)
+        .complete();
+
+      // Menandatangani transaksi
+      const signedTx = await wallet.signTx(txDraft);
+
       // Submit transaksi dan mendapatkan transaksi hash
-      const txHash = await wallet.submitTx(signedTx);
-      alert(`Transaction successful : ${txHash}`);
+      const txHash_ = await wallet.submitTx(signedTx);
+      alert(`Transaction successful : ${txHash_}`);
       return;
     } catch (error) {
       // Error handling jika transaksi gagal

@@ -10,8 +10,6 @@ import {
   MeshTxBuilder,
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
-import dotenv from "dotenv";
-dotenv.config();
 
 // Integrasi smart-contract
 import contractBlueprint from "../../aiken-workspace/plutus.json";
@@ -40,37 +38,39 @@ export default function Lock() {
   }
 
   async function lockAssets() {
-    // Mendapatkan kontrak address
-    const { scriptAddr } = getScript(
-      contractBlueprint.validators[0].compiledCode
-    );
-
-    // Mendapatkan index utxo dan alamat wallet
-    const { utxos, walletAddress } = await getWalletInfo();
-
-    // Mendapatkan pub key hash sebagai persetujuan user untuk menandatangi transaksi
-    const signerHash = deserializeAddress(walletAddress).pubKeyHash;
-
-    const lovelaceAmount = (amount * 1000000).toString();
-    // Menentukan jumlah aset yang akan di kunci
-    const assets: Asset[] = [{ unit: "lovelace", quantity: lovelaceAmount }];
-
-    // Membuat draft transaksi
-    const txBuild = new MeshTxBuilder({
-      fetcher: nodeProvider,
-      submitter: nodeProvider,
-    });
-    const txDraft = await txBuild
-      .txOut(scriptAddr, assets)
-      .txOutDatumHashValue(mConStr0([signerHash]))
-      .changeAddress(walletAddress)
-      .selectUtxosFrom(utxos)
-      .complete();
-
-    // Menandatangani transaksi
-    const signedTx = await wallet.signTx(txDraft);
-
     try {
+      // Mendapatkan kontrak address
+      const { scriptAddr } = getScript(
+        contractBlueprint.validators[0].compiledCode
+      );
+
+      // Mendapatkan index utxo dan alamat wallet
+      const { utxos, walletAddress } = await getWalletInfo();
+
+      // Mendapatkan pub key hash sebagai persetujuan user untuk menandatangi transaksi
+      const signerHash = deserializeAddress(walletAddress).pubKeyHash;
+
+      const lovelaceAmount = (amount * 1000000).toString();
+      // Menentukan jumlah aset yang akan di kunci
+      const assets: Asset[] = [{ unit: "lovelace", quantity: lovelaceAmount }];
+
+      // Membuat draft transaksi
+      const txBuild = new MeshTxBuilder({
+        fetcher: nodeProvider,
+        evaluator: nodeProvider,
+        verbose: true,
+      });
+      const txDraft = await txBuild
+        .setNetwork("preprod")
+        .txOut(scriptAddr, assets)
+        .txOutDatumHashValue(mConStr0([signerHash]))
+        .changeAddress(walletAddress)
+        .selectUtxosFrom(utxos)
+        .complete();
+
+      // Menandatangani transaksi
+      const signedTx = await wallet.signTx(txDraft);
+
       // Submit transaksi dan mendapatkan transaksi hash
       const txHash = await wallet.submitTx(signedTx);
       alert(`Transaction successful : ${txHash}`);
